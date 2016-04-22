@@ -1,0 +1,2 @@
+22/4/16
+trying to add record and play functionality by looking at  record play exampl app provided by mplab
