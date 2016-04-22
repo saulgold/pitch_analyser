@@ -9,14 +9,14 @@ void getAbsSqrd(fractcomplex *inputSignal, double *absOutputSignal, int frameSiz
 		
 }
 
-void getFrequency(int position,double frequency, int frameSize)
+void getFrequency(int position,float frequency, int frameSize)
 {
-	frequency = 8000*(position/128);
+	frequency = 4000.0*(position/64.0);
 }
-void findPeakFrequency(double *inputSignal, int maxFreqPosition,int frameSize)
+void findPeakFrequency(double *inputSignal, int maxFreqPosition,int max, int frameSize)
 {
 	int i;
-	int max =0;
+	max =0;
 	for(i = 0; i<frameSize/2;i++){
 		if(inputSignal[i] > max){
 			max = inputSignal[i];
