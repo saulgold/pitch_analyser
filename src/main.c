@@ -73,7 +73,8 @@ int playback;							/* If set means playback is in progress	*/
 int erasedBeforeRecord;				/* If set means that erase before record	*/
 int fileSize=0;									/* is complete	*/ 
 long address;							/* Used for erasing the flash			*/
-int storage [10][128];
+//char storage [30][128];
+//char storage2[10][128];
 int i1 __attribute__((space(dma)));
 int j __attribute__((space(dma))); 
 int k __attribute__((space(dma)));
@@ -136,18 +137,54 @@ int main(void)
 		/* Obtaing the ADC samples	*/
 			while(ADCChannelIsBusy(pADCChannelHandle));
 			ADCChannelRead	(pADCChannelHandle,samples,FRAME_SIZE);
-
-			i1=0;
-		if( record==1){
-			k=0;
-
+			G711Lin2Ulaw(samples,encodedSamples,FRAME_SIZE);
 			
-				//G711Lin2Ulaw(samples,encodedSamples,FRAME_SIZE);
-				for(i1=0;i1<FRAME_SIZE;i1=i1+1){
-					storage[j][i1] = samples[i1];
+
+		
+		if( record==1){
+			
+					if(erasedBeforeRecord == 1){
 					
-				}
-				j++;			
+					ADCChannelStop(pADCChannelHandle);
+					OCPWMStop	(pOCPWMHandle);
+					currentWriteAddress = WRITE_START_ADDRESS;
+					userPlaybackAddress = WRITE_START_ADDRESS;
+			
+			for(address = WRITE_START_ADDRESS; address < AT25F4096DRV_LAST_ADDRESS; address += 0x10000)
+					{
+						/* Erase each sector. Each sector is 0xFFFF long	*/
+						AT25F4096IoCtl(pFlashMemoryHandle,AT25F4096DRV_WRITE_ENABLE,0);	
+						AT25F4096IoCtl(pFlashMemoryHandle,AT25F4096DRV_SECTOR_ERASE,(void *)&address);	
+						while(AT25F4096IsBusy(pFlashMemoryHandle));
+					}
+					
+						ADCChannelStart(pADCChannelHandle);
+					OCPWMStart		(pOCPWMHandle);	
+			erasedBeforeRecord=0;
+		}
+			
+			
+			k=0;
+			while(AT25F4096IsBusy(pFlashMemoryHandle));
+			AT25F4096IoCtl(pFlashMemoryHandle,AT25F4096DRV_WRITE_ENABLE,0);
+			AT25F4096Write(pFlashMemoryHandle,currentWriteAddress,encodedSamples,FRAME_SIZE);
+			currentWriteAddress += FRAME_SIZE;
+
+		if(currentWriteAddress >= AT25F4096DRV_LAST_ADDRESS)
+					{
+						erasedBeforeRecord = 1;
+						record = 0;
+						playback = 0;
+					}
+//				//G711Lin2Ulaw(samples,encodedSamples,FRAME_SIZE);
+//				for(i1=0;i1<FRAME_SIZE;i1=i1+1){
+//					storage[j][i1] = encodedSamples[i1];
+//					
+//				}
+//				j++;
+//				if(j>10){
+//					j=0;	
+//				}			
 							
 		}
 		/* If playback is enabled, then start playing back samples from the
@@ -159,18 +196,34 @@ int main(void)
 
 			
 		if ( playback==1){
-			j=0;
-				
+//			j=0;
+			erasedBeforeRecord=1;
+//				
+//
+//			for(i1=0;i1<FRAME_SIZE;i1++){
+//					encodedSamples[i1] = storage[k][i1];
+//					G711Ulaw2Lin (encodedSamples,decodedSamples, FRAME_SIZE);
+//				}
+//				
+//				k++;
+//				if(k>10){
+//					k=0;
+//				}
 
-			for(i1=0;i1<FRAME_SIZE;i1++){
-					samples[i1] = storage[k][i1];
-				
+
+	while(AT25F4096IsBusy(pFlashMemoryHandle));				
+	AT25F4096Read(pFlashMemoryHandle,userPlaybackAddress,encodedSamples,FRAME_SIZE);
+	while(AT25F4096IsBusy(pFlashMemoryHandle));
+			
+				userPlaybackAddress += FRAME_SIZE;
+				if(userPlaybackAddress > currentWriteAddress)
+				{
+					userPlaybackAddress = WRITE_START_ADDRESS;
 				}
-				
-				k++;
 		}
-				while(OCPWMIsBusy(pOCPWMHandle));	
-			OCPWMWrite (pOCPWMHandle,samples,FRAME_SIZE);
+			G711Ulaw2Lin (encodedSamples,decodedSamples, FRAME_SIZE);
+			while(OCPWMIsBusy(pOCPWMHandle));	
+			OCPWMWrite (pOCPWMHandle,decodedSamples,FRAME_SIZE);
 			/* Decode the samples	*/
 			//G711Ulaw2Lin (encodedSamples,decodedSamples, FRAME_SIZE);
 	    //	__delay32( delay_cycles );
@@ -205,7 +258,10 @@ int main(void)
 				playback =0;
 				record=0;
 				GREEN_LED =1;
-				YELLOW_LED=1;				
+				YELLOW_LED=1;
+				for(i1=0;i1<FRAME_SIZE;i1++){
+					decodedSamples[i1]=0;
+				}			
 			}
 	
 }
